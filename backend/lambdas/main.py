@@ -1,36 +1,56 @@
-# db -> postgres, pgvector
-# hosting -> aws
-# api -> fastapi
-# RAG -> qwen 2 llm, langchain
-# misc -> youtube api, ytdlp
 
-# frontend ->
-# react, tailwind, vercel
-from fastapi import FastAPI
-from dotenv import load_dotenv
+# from fastapi import FastAPI
+# from dotenv import load_dotenv
 import asyncio
+import boto3
+from botocore.exceptions import ClientError
 
+# secrets should live in AWS Secrets Manager
 
 
 def lambda_handler(event, context):
-    return asyncio.run(search_method())
-    
 
-#@app.get("/search")
-async def search_method():
+    secret_name = "YT_API_KEY"
+    region_name = "us-east-2"
+
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+
+    try:
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+
+        secret = get_secret_value_response['SecretString']
+        return {
+            'statusCode': 200,
+            'body': asyncio.run(search_method({'x': ()}, secret))
+        }
+
+
+    except ClientError as e:
+        # For a list of exceptions thrown, see
+        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+        return {
+            'statusCode': 500,
+            'body': e
+        }
+
+    
+async def search_method(input: dict[str, tuple[str]], api_key: str):
     from googleapiclient.discovery import build
-    import os
-    from dotenv import load_dotenv
+ #   import os
+    # from dotenv import load_dotenv
     import logging
-    import json
 
     try:
 
-    # outputs = []
         urls = set()
 
-        load_dotenv()
-        yt_api_key= os.getenv("YT_API_KEY")
+        yt_api_key = api_key
 
         # should be replaced with search params that come from the lambda
         input_context: dict[str, tuple] = {"artists": ("Prettifun",)}
@@ -46,12 +66,14 @@ async def search_method():
             urls.add(url)
 
         logging.info(urls)
+        
 
+        # turn this into a json at some point
         return urls
     
     except Exception as e:
         print('here')
-        logging.error(e)
+        raise e
 
 async def search_video(query: str, yt, max_results=2, videoDuration="short") -> dict[str]:
     import logging
@@ -68,19 +90,13 @@ async def search_video(query: str, yt, max_results=2, videoDuration="short") -> 
         )
 
         response = await asyncio.to_thread(request.execute)
-        logging.info(response)
+        print(response)
 
         return response["items"]
     
     except Exception as e:
         print('here2')
-        logging.error(e)
-
-
-
-if __name__ == "__main__":
-    result = asyncio.run(search_method())
-    print(f"Returned result: {result}")
+        raise e
 
 
 
