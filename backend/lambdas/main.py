@@ -4,36 +4,40 @@
 import asyncio
 import boto3
 from botocore.exceptions import ClientError
+import json
+import logging
+from googleapiclient.discovery import build
 
-# secrets should live in AWS Secrets Manager
 
 
+# input should look like {"artists": (str, str, str..., str)}
 def lambda_handler(event, context):
 
+    # need to grab context dict from lambda_handler for using instead of manual
     secret_name = "YT_API_KEY"
     region_name = "us-east-2"
 
     session = boto3.session.Session()
     client = session.client(
         service_name='secretsmanager',
-        region_name=region_name
+        region_name='us-east-2'
     )
 
     try:
         get_secret_value_response = client.get_secret_value(
-            SecretId=secret_name
+            SecretId='YT_API_KEY'
         )
 
         secret = get_secret_value_response['SecretString']
+        secret_key = json.loads(secret)['YT_API_KEY']
+
         return {
             'statusCode': 200,
-            'body': asyncio.run(search_method({'x': ()}, secret))
+            'body': asyncio.run(search_method({"artists": ("Prettifun",)}, secret_key))
         }
 
-
     except ClientError as e:
-        # For a list of exceptions thrown, see
-        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+
         return {
             'statusCode': 500,
             'body': e
@@ -41,42 +45,38 @@ def lambda_handler(event, context):
 
     
 async def search_method(input: dict[str, tuple[str]], api_key: str):
-    from googleapiclient.discovery import build
- #   import os
-    # from dotenv import load_dotenv
-    import logging
 
     try:
 
-        urls = set()
-
-        yt_api_key = api_key
-
-        # should be replaced with search params that come from the lambda
-        input_context: dict[str, tuple] = {"artists": ("Prettifun",)}
-        youtube = build("youtube", "v3", developerKey=yt_api_key)
+        urls = []
+     #   input_context: dict[str, tuple] = {"artists": ("Prettifun",)}
 
 
-        outputs = [search_video(f"royalty free {artist} loop kit", youtube) for artist in input_context["artists"]]
+        youtube = build("youtube", "v3", developerKey=api_key)
+
+
+        outputs = [search_video(f"royalty free {artist} loop kit", youtube) for artist in input["artists"]]
         results = await asyncio.gather(*outputs)
         logging.info(results)
 
         for video in results[0]:
             url = f"https://youtube.com/watch?v={video['id']['videoId']}"
-            urls.add(url)
+            urls.append(url)
 
         logging.info(urls)
         
+        return {
+        "statusCode": 200,
+        "body": json.dumps({
+            "message": urls,
+        }),
+        }
 
-        # turn this into a json at some point
-        return urls
-    
     except Exception as e:
         print('here')
         raise e
 
 async def search_video(query: str, yt, max_results=2, videoDuration="short") -> dict[str]:
-    import logging
 
     try: 
         # include published after maybe
