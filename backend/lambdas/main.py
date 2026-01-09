@@ -1,6 +1,3 @@
-
-# from fastapi import FastAPI
-# from dotenv import load_dotenv
 import asyncio
 import boto3
 from botocore.exceptions import ClientError
@@ -13,7 +10,7 @@ from googleapiclient.discovery import build
 # input should look like {"artists": (str, str, str..., str)}
 def lambda_handler(event, context):
 
-    # need to grab context dict from lambda_handler for using instead of manual
+    # TODO need to grab context dict from lambda_handler for using instead of manual
     secret_name = "YT_API_KEY"
     region_name = "us-east-2"
 
@@ -49,9 +46,6 @@ async def search_method(input: dict[str, tuple[str]], api_key: str):
     try:
 
         urls = []
-     #   input_context: dict[str, tuple] = {"artists": ("Prettifun",)}
-
-
         youtube = build("youtube", "v3", developerKey=api_key)
 
 
@@ -79,7 +73,6 @@ async def search_method(input: dict[str, tuple[str]], api_key: str):
 async def search_video(query: str, yt, max_results=2, videoDuration="short") -> dict[str]:
 
     try: 
-        # include published after maybe
         request = yt.search().list(
             q=query,
             part="id,snippet",
@@ -97,22 +90,6 @@ async def search_video(query: str, yt, max_results=2, videoDuration="short") -> 
     except Exception as e:
         print('here2')
         raise e
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # TECH STACK
