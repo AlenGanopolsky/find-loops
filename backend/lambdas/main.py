@@ -11,6 +11,7 @@ from googleapiclient.discovery import build
 def lambda_handler(event, context):
 
     # TODO need to grab context dict from lambda_handler for using instead of manual
+    # TODO rate limit this code such that asyncio.to_thread can run, as the thread pool in the background has roughly 20 threads
     secret_name = "YT_API_KEY"
     region_name = "us-east-2"
 
@@ -70,7 +71,7 @@ async def search_method(input: dict[str, tuple[str]], api_key: str):
         print('here')
         raise e
 
-async def search_video(query: str, yt, max_results=2, videoDuration="short") -> dict[str]:
+async def search_video(query: str, yt, max_results=2, videoDuration="short", videoLicense="videoLicense") -> dict[str]:
 
     try: 
         request = yt.search().list(
@@ -78,7 +79,8 @@ async def search_video(query: str, yt, max_results=2, videoDuration="short") -> 
             part="id,snippet",
             maxResults=max_results,
             type="video",
-            videoDuration=videoDuration
+            videoDuration=videoDuration,
+            videoLicense =videoLicense
 
         )
 

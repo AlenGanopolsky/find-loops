@@ -4,9 +4,12 @@
 import os
 import logging
 import json
+from pytubefix import YouTube
+from pytubefix.cli import on_progress
+import asyncio
 
 # TODO increase memory cap for /tmp directory
-def lambda_handler(event, context):
+async def lambda_handler(event, context):
     
     """
     Downloads a list of urls to the /tmp directory of the lambda function, subsequently pastes the mp3 files into s3. 
@@ -20,7 +23,7 @@ def lambda_handler(event, context):
 
         urls = event["urls"]
         for url in urls:
-            download_file(url)
+            await asyncio.to_thread(download_file(url))
         
         filenames = [f for f in os.listdir(url_dir) if f.endswith(('.mp3', '.m4a', '.webm'))]
 
@@ -38,26 +41,19 @@ def lambda_handler(event, context):
 
 
 def download_file(url: str, download_dir = "/tmp"):
-    from yt_dlp import YoutubeDL
-    import os
+    try:
 
-    # yt_dlp config options here
-    format = os.path.join(download_dir, '%(title)s.%(ext)s')
+        yt = YouTube(url, on_progress_callback=on_progress)
+        print(yt.title)
 
-    ydl_opts = {
-    'format': 'bestaudio/best',
-    'outtmpl': format,
-    'noplaylist': True,
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
-}
-
-    with YoutubeDL(ydl_opts) as ydl:
-        ydl.download(url)
+        ys = yt.streams.get_audio_only()
+        ys.download(output_path=f"{download_dir}")
+        print("success!")
     
+    except Exception as e:
+        raise e
+
+
 
 def upload_file(file_name, bucket, object_name=None):
 
@@ -89,3 +85,8 @@ def upload_file(file_name, bucket, object_name=None):
         return False
     
     return True
+
+
+
+if __name__ == "__main__":
+    download_file()
