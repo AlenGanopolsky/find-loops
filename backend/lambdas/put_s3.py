@@ -42,6 +42,7 @@ async def lambda_handler(event, context):
 
 def download_file(url: str, download_dir = "/tmp"):
     try:
+        download_dir = r"C:\Users\aleng\test_url"
 
         yt = YouTube(url, on_progress_callback=on_progress)
         print(yt.title)
@@ -55,7 +56,7 @@ def download_file(url: str, download_dir = "/tmp"):
 
 
 
-def upload_file(file_name, bucket, object_name=None):
+async def upload_file(file_name, bucket, object_name=None):
 
     import logging
     import boto3
@@ -78,7 +79,7 @@ def upload_file(file_name, bucket, object_name=None):
     # Upload the file
     s3_client = boto3.client('s3')
     try:
-        response = s3_client.upload_file(file_name, bucket, object_name)
+        response = await s3_client.upload_file(file_name, bucket, object_name)
 
     except ClientError as e:
         logging.error(e)
@@ -89,4 +90,4 @@ def upload_file(file_name, bucket, object_name=None):
 
 
 if __name__ == "__main__":
-    download_file()
+    download_file("https://youtu.be/3_aRc1NUj0g?si=N8CN0w1whknHmDy2")
