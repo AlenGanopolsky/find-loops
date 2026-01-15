@@ -1,13 +1,15 @@
-
 # a microservice that takes the downloaded, parsed yt audio files and places them in s3 -> which is then going to be used by the RAG model in a separate pipeline
 # all code for downloading yt videos, parsing them, and sending them to s3 is done here
 
-
 import os
 import logging
+import json
+from pytubefix import YouTube
+from pytubefix.cli import on_progress
+import asyncio
 
-
-def lambda_handler(event, context):
+# TODO increase memory cap for /tmp directory
+async def lambda_handler(event, context):
     
     """
     Downloads a list of urls to the /tmp directory of the lambda function, subsequently pastes the mp3 files into s3. 
@@ -21,40 +23,40 @@ def lambda_handler(event, context):
 
         urls = event["urls"]
         for url in urls:
-            download_file(url)
+            await asyncio.to_thread(download_file(url))
         
-        filenames = os.listdir(url_dir)
+        filenames = [f for f in os.listdir(url_dir) if f.endswith(('.mp3', '.m4a', '.webm'))]
 
         for filename in filenames:
-            upload_file(filename, bucket_name)
+            upload_file(os.path.join(url_dir, filename), bucket_name) 
+
+        
+        return {
+         'statusCode': 200,
+         'body': json.dumps('Success!')
+        }
     
     except Exception as e:
         logging.error(e)
 
 
 def download_file(url: str, download_dir = "/tmp"):
-    from yt_dlp import YoutubeDL
-    import os
+    try:
+        download_dir = r"C:\Users\aleng\test_url"
 
-    # yt_dlp config options here
-    format = os.path.join(download_dir, '%(title)s.%(ext)s')
+        yt = YouTube(url, on_progress_callback=on_progress)
+        print(yt.title)
 
-    ydl_opts = {
-
-        'format': 'bestaudio/best',
-        'extract_audio': True,          
-        'audio_format': 'mp3',           
-        'audio_quality': '192',
-        'outtmpl': f'{format}',
-        'noplaylist': True,
-
-    }
-
-    with YoutubeDL(ydl_opts) as ydl:
-        ydl.download(url)
+        ys = yt.streams.get_audio_only()
+        ys.download(output_path=f"{download_dir}")
+        print("success!")
     
+    except Exception as e:
+        raise e
 
-def upload_file(file_name, bucket, object_name=None):
+
+
+async def upload_file(file_name, bucket, object_name=None):
 
     import logging
     import boto3
@@ -77,7 +79,7 @@ def upload_file(file_name, bucket, object_name=None):
     # Upload the file
     s3_client = boto3.client('s3')
     try:
-        response = s3_client.upload_file(file_name, bucket, object_name)
+        response = await s3_client.upload_file(file_name, bucket, object_name)
 
     except ClientError as e:
         logging.error(e)
@@ -86,16 +88,6 @@ def upload_file(file_name, bucket, object_name=None):
     return True
 
 
-    # If S3 object_name was not specified, use file_name
-    if object_name is None:
-        object_name = os.path.basename(file_name)
 
-    # Upload the file
-    s3_client = boto3.client('s3')
-    try:
-        response = s3_client.upload_file(file_name, bucket, object_name)
-    except ClientError as e:
-        logging.error(e)
-        return False
-    return True
-
+if __name__ == "__main__":
+    download_file("https://youtu.be/3_aRc1NUj0g?si=N8CN0w1whknHmDy2")
